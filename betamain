@@ -1,0 +1,225 @@
+import React, { useState } from "react";
+
+const questions = [
+  {
+    id: "welcome",
+    text: "PCAO Interactive Quiz\n\n\n\n\n\n\nCreator: Aravind Balaji\n\nLegal Intern\n\nPolk County Attorney's Office",
+    next: "polkCounty"
+  },
+  {
+    id: "polkCounty",
+    text: "Have at least one of your cases been filed in Polk County, Iowa?",
+    options: [
+      { label: "Yes", next: "fineAmount" },
+      { label: "No", result: () => (<a href="https://www.iowacourts.gov/iowa-courts/court-directory" className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Go to Iowa Court Directory</a>) }
+    ]
+  },
+  {
+    id: "fineAmount",
+    text: "How much do you need to pay in fines?",
+    options: [
+      { label: "Less than $300", result: "You are not eligible for either one of our programs. For assistance, call (515) 286-3077." },
+      { label: "$300 or more", next: "issues" }
+    ]
+  },
+  {
+    id: "issues",
+    text: "Select all that apply:",
+    checkboxes: [
+      "I owe court fines",
+      "I am on probation/parole",
+      "My vehicle registration is on hold",
+      "My drivers license is suspended"
+    ],
+    next: "issueFollowup"
+  },
+  {
+    id: "issueFollowup",
+    text: "Please click continue to determine eligibility based on your selections.",
+    evaluate: (answers) => {
+      const issues = answers["issues"] || [];
+      const hasLicense = issues.includes("My drivers license is suspended");
+      const hasProbation = issues.includes("I am on probation/parole");
+      const hasOtherIssues = issues.some(issue => [
+        "I owe court fines",
+        "I am on probation/parole",
+        "My vehicle registration is on hold"
+      ].includes(issue));
+
+      if (hasLicense && hasProbation) return "licenseIntent";
+      if (hasLicense) return "licenseCheck";
+      if (hasOtherIssues) return "thirtyOneDays";
+      return "noEligibility";
+    }
+  },
+  {
+    id: "thirtyOneDays",
+    text: "Has it been more than 31 days since your sentencing hearing?",
+    options: [
+      { label: "No", result: "You must wait 31 days to proceed. For assistance, call (515) 286-3077." },
+      { label: "Yes", result: () => (<a href="https://attorneycollections.polkcountyiowa.gov/Home/WageAssignment" className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Go to Payment Plan</a>) }
+    ]
+  },
+  {
+    id: "licenseCheck",
+    text: "Has it been more than 60 days since your sentencing date?",
+    options: [
+      { label: "No", result: "You are not eligible. For assistance, call (515) 286-3077." },
+      { label: "Yes", next: "specialLicense" }
+    ]
+  },
+  {
+    id: "licenseIntent",
+    text: "What do you want to do?",
+    options: [
+      { label: "Fulfill probation/parole requirements", next: "thirtyOneDays" },
+      { label: "Receive my license only", next: "sixtyDays", className: "bg-red-600 hover:bg-red-700" }
+    ],
+    warning: "⚠️ You can only have one plan open at a time. Starting a license plan may prevent you from fulfilling other obligations."
+  },
+  {
+    id: "sixtyDays",
+    text: "Has it been more than 60 days since your sentencing hearing?",
+    options: [
+      { label: "Yes", next: "specialLicense" },
+      { label: "No", result: "You are not eligible. For assistance, call (515) 286-3077." }
+    ]
+  },
+  {
+    id: "specialLicense",
+    text: "Are you seeking a special license for driving to work/school?",
+    options: [
+      { label: "Yes", result: () => (<a href="https://iowadot.gov/mvd/driverslicense/TRL" className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Go to Temporary Restricted License Page</a>) },
+      { label: "No", next: "outOfState" }
+    ]
+  },
+  {
+    id: "outOfState",
+    text: "Are there any out-of-state fines holding up the license?",
+    options: [
+      { label: "Yes", result: "You do not qualify. For assistance, call (515) 286-3077." },
+      { label: "No", result: () => (<a href="https://attorneycollections.polkcountyiowa.gov/Home/LRP" className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Go to LRP</a>) }
+    ]
+  },
+  {
+    id: "noEligibility",
+    text: "You are not eligible for either one of our programs. For help, call (515) 286-3077."
+  },
+  {
+    id: "resultDisplay",
+    text: ""
+  }
+];
+
+export default function Quiz() {
+  const [step, setStep] = useState("welcome");
+  const [answers, setAnswers] = useState({});
+
+  const current = questions.find(q => q.id === step);
+
+  const handleOptionClick = (option) => {
+    if (typeof option.result === "function") {
+      setAnswers({ ...answers, result: option.result() });
+      setStep("resultDisplay");
+    } else if (typeof option.result === "string") {
+      setAnswers({ ...answers, result: option.result });
+      setStep("resultDisplay");
+    } else {
+      setStep(option.next);
+    }
+  };
+
+  const handleCheckboxChange = (checkbox, checked) => {
+    const selected = new Set(answers["issues"] || []);
+    if (checked) selected.add(checkbox);
+    else selected.delete(checkbox);
+    setAnswers({ ...answers, issues: [...selected] });
+  };
+
+  const handleContinue = () => {
+    if (typeof current.evaluate === "function") {
+      const next = current.evaluate(answers);
+      if (next === "noEligibility") {
+        setAnswers({ ...answers, result: "You are not eligible for either one of our programs. For help, call (515) 286-3077." });
+        setStep("resultDisplay");
+      } else {
+        setStep(next);
+      }
+    } else if (current.next) {
+      setStep(current.next);
+    }
+  };
+
+  return (
+    <div className="p-6 max-w-3xl mx-auto text-center bg-gray-50 rounded-xl shadow-md">
+      <div className="text-2xl font-bold mb-6 whitespace-pre-line text-gray-800">{current.text}</div>
+      {current.options && (
+        <div className="flex flex-col gap-4">
+          {current.options.map((opt, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleOptionClick(opt)}
+              className={`${opt.className || "bg-blue-600 hover:bg-blue-700"} text-white p-3 rounded-lg transition`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+{current.warning && (
+  <div className="mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded flex items-start gap-2">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth="1.5"
+      stroke="currentColor"
+      className="w-6 h-6 text-yellow-600 mt-1"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 9v2.25m0 4.5h.007v.008H12v-.008zm.007-10.5a9 9 0 11-9 9 9 9 0 019-9z"
+      />
+    </svg>
+    <span>{current.warning}</span>
+  </div>
+)}
+
+      {current.checkboxes && (
+        <div className="flex flex-col gap-2 items-start">
+          {current.checkboxes.map((cb, idx) => (
+            <label key={idx} className="flex items-center gap-2 text-left text-gray-700">
+              <input
+                type="checkbox"
+                onChange={(e) => handleCheckboxChange(cb, e.target.checked)}
+              />
+              {cb}
+            </label>
+          ))}
+          <div className="w-full text-center">
+            <button
+              onClick={handleContinue}
+              className="mt-4 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+      {!current.options && !current.checkboxes && (
+        <button
+          onClick={handleContinue}
+          className="mt-4 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition"
+        >
+          Continue
+        </button>
+      )}
+      {step === "resultDisplay" && (
+        <div className="mt-6 text-lg font-semibold text-green-700">
+          {answers.result}
+        </div>
+      )}
+    </div>
+  );
+}
